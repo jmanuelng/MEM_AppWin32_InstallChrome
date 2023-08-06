@@ -157,7 +157,7 @@ if ($result -eq 0) {
         Remove-Item $tempFile.FullName
 
         Write-Host "Winget install exit code: $exitCode"
-        Write-Host "Winget installation output: $installInfo"
+        #Write-Host "Winget installation output: $installInfo"          #Remove comment to troubleshoot.
         
         if ($exitCode -eq 0) {
             Write-Host "Winget successfully installed application."
