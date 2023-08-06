@@ -149,6 +149,7 @@ if (-not $wingetPath) {
 if ($result -eq 0) {
     try {
         $tempFile = New-TemporaryFile
+        Write-Host "Initiating App $WingetAppID Installation"
         $processResult = Start-Process -FilePath "$wingetPath" -ArgumentList "install -e --id ""$WingetAppID"" --scope=machine --silent --accept-package-agreements --accept-source-agreements --force" -NoNewWindow -Wait -RedirectStandardOutput $tempFile.FullName -PassThru
 
         $exitCode = $processResult.ExitCode
