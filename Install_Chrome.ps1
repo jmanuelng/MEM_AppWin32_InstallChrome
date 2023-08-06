@@ -161,7 +161,7 @@ if ($result -eq 0) {
         
         if ($exitCode -eq 0) {
             Write-Host "Winget successfully installed application."
-            $detectSummary += "Application installed via Winget. "
+            $detectSummary += "Installed $WingetAppID via Winget. "
             $result = 0
         } else {
             $detectSummary += "Error during installation: $installInfo, exit code: $exitCode. "
