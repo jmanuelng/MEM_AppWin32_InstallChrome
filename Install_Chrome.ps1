@@ -72,7 +72,7 @@ function Find-WingetPath {
     # Define possible locations for winget.exe
     $possibleLocations = @(
         "${env:ProgramFiles}\WindowsApps\Microsoft.DesktopAppInstaller*_x64__8wekyb3d8bbwe\winget.exe", 
-        "${env:ProgramFiles(x86)}\WindowsApps\Microsoft.DesktopAppInstaller*_x64__8wekyb3d8bbwe\winget.exe",
+        "${env:ProgramFiles(x86)}\WindowsApps\Microsoft.DesktopAppInstaller*_8wekyb3d8bbwe\winget.exe",
         "${env:LOCALAPPDATA}\Microsoft\WindowsApps\winget.exe",
         "${env:USERPROFILE}\AppData\Local\Microsoft\WindowsApps\winget.exe"
     )
