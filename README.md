@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `MEM_AppWin32_InstallChrome` repository offers scripts designed to ensure a consistently up-to-date installation of Google Chrome. These can be deployed as a Win32 package.
+The `MEM_AppWin32_InstallChrome` repository offers scripts designed to ensure a consistently up-to-date installation of Google Chrome. These can be deployed as a Win32 package, can be installed as SYSTEM.
 
 While some apps, such as Google Chrome, are not yet available via the "New" Microsoft Store method, this repository provides a solution. By harnessing the capabilities of `winget`, Microsoft's package manager for Windows, these scripts guarantee that upon deployment, devices always receive the latest version of Google Chrome. This approach not only streamlines the deployment process but also ensures devices are protected from potential vulnerabilities present in outdated software versions.
 
@@ -34,6 +34,7 @@ A special thanks to John Bryntze! His videos, referenced [here](https://www.yout
    - Configure the app information, settings, and assignments as needed.
        - Install command: `powershell.exe -executionpolicy ByPass -file .\Install_Chrome.ps1`
        - Uninstall command: `powershell.exe -executionpolicy ByPass -file .\Uninstall_Chrome.ps1`
+       - Install behavior: System
        - Detection rules: Use custom script `Detect_Chrome.ps1`
    - Save and assign the app to desired group(s).
 
