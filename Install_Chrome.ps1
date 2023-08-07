@@ -172,7 +172,7 @@ if ($result -eq 0) {
             $detectSummary += "Installed $WingetAppID via Winget. "
             $result = 0
         } else {
-            $detectSummary += "Error during installation: $installInfo, exit code: $exitCode. "
+            $detectSummary += "Error during installation, exit code: $exitCode. "
             $result = 1
         }
     }

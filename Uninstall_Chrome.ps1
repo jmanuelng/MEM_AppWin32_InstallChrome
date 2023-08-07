@@ -172,7 +172,7 @@ if ($result -eq 0) {
             $detectSummary += "Uninstalled $WingetAppID via Winget. "
             $result = 0
         } else {
-            $detectSummary += "Error during uninstall: $uninstallInfo, exit code: $exitCode. "
+            $detectSummary += "Error during uninstall, exit code: $exitCode. "
             $result = 1
         }
     }
