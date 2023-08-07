@@ -1,5 +1,43 @@
 <#
+.DESCRIPTION
+    Detects Google Chrome browser's installation  status on a Windows device and retrieve its version if found. 
+    By inspecting familiar file paths and registry entries where Google Chrome is generally installed, 
+    the script identifies location path and version of the browser.
 
+    The script is divided into two major sections: 
+    - A Functions region which encompasses the primary logic for identifying the installation.
+    - A Main region that uses the function, assesses the results, and provides 
+      a summarized output of findings.
+
+    If Google Chrome is detected, script will return an "OK" status along with the 
+    version number. If it's not found, it will return "FAIL" status.
+
+.HOW IT WORKS
+    1. `Get-ChromeExeDetails` function searches for `chrome.exe` executable, it also searches specific registry paths.
+       Function returns a custom object with two properties:
+       - InstallLocation: Specifies where `chrome.exe` is located.
+       - DisplayVersion: Indicates the version of Google Chrome.
+       
+    3. Main region calls `Get-ChromeExeDetails`. If found outcome will be:
+       - "OK" if Google Chrome is found and the version is successfully extracted, and will "exit 0"
+       - "FAIL" if Google Chrome isn't found, with "exit 1"
+       - "NOTE" as a default status for other scenarios.
+
+.USAGE
+    Distribute as an Intune Win32 package.
+
+.NOTES
+    Keep in mind that changes in Google Chrome's installation procedures or the Windows OS 
+    might necessitate modifications in the future. It's always a good practice to test 
+    scripts in a controlled setting before applying them in a production environment.
+
+.DISCLAIMER
+    This script is delivered as-is without any guarantees or warranties. Always ensure 
+    you have backups and take necessary precautions when executing scripts, particularly 
+    in production environments.
+
+.LAST MODIFIED
+    August 6th, 2023
 
 #>
 

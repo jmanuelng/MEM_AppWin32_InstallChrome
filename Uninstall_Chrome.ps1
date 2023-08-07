@@ -1,12 +1,12 @@
 <#
 .DESCRIPTION
-    Automate the process of installing software using the Windows Package Manager (Winget).
+    Automate the process of uninstalling software using the Windows Package Manager (Winget).
     It primarily focuses on Google Chrome, but the structure can be adjusted to support other software applications by changing the WingetAppID variable.
 
 .EXAMPLE
     $WingetAppID = "Your.ApplicationID"
-    .\ScriptName.ps1
-    Installs the application associated with "Your.ApplicationID" using Winget, 
+    .\UninstallScriptName.ps1
+    Uninstalls the application associated with "Your.ApplicationID" using Winget, 
     assuming Winget is available on the device.
 
 .NOTES
@@ -128,10 +128,10 @@ function Find-WingetPath {
 $wingetPath = ""                # Path to Winget executable
 $detectSummary = ""             # Script execution summary
 $result = 0                     # Exit result (default to 0)
-$WingetAppID = "Google.Chrome"  # Winget Application ID
+$WingetAppID = "Google.Chrome"  # Winget Application ID for uninstallation
 $processResult = $null          # Winget process result
-$exitCode = $null               # Software installation exit code
-$installInfo                    # Information about the Winget installation process
+$exitCode = $null               # Software uninstallation exit code
+$uninstallInfo                  # Information about the Winget uninstallation process
 #endregion Initialization
 
 # Make the log easier to read
@@ -153,32 +153,32 @@ if (-not $wingetPath) {
     $detectSummary += "Winget located at $wingetPath. "
 }
 
-# Use Winget to install the desired software
+# Use Winget to uninstall the desired software
 if ($result -eq 0) {
     try {
         $tempFile = New-TemporaryFile
-        Write-Host "Initiating App $WingetAppID Installation"
-        $processResult = Start-Process -FilePath "$wingetPath" -ArgumentList "install -e --id ""$WingetAppID"" --scope=machine --silent --accept-package-agreements --accept-source-agreements --force" -NoNewWindow -Wait -RedirectStandardOutput $tempFile.FullName -PassThru
+        Write-Host "Initiating App $WingetAppID Uninstall"
+        $processResult = Start-Process -FilePath "$wingetPath" -ArgumentList "uninstall -e --id ""$WingetAppID"" --scope=machine --silent --accept-source-agreements --force" -NoNewWindow -Wait -RedirectStandardOutput $tempFile.FullName -PassThru
 
         $exitCode = $processResult.ExitCode
-        $installInfo = Get-Content $tempFile.FullName
+        $uninstallInfo = Get-Content $tempFile.FullName
         Remove-Item $tempFile.FullName
 
-        Write-Host "Winget install exit code: $exitCode"
-        #Write-Host "Winget installation output: $installInfo"          #Remove comment to troubleshoot.
+        Write-Host "Winget uninstall exit code: $exitCode"
+        #Write-Host "Winget uninstallation output: $uninstallInfo"          #Remove comment to troubleshoot.
         
         if ($exitCode -eq 0) {
-            Write-Host "Winget successfully installed application."
-            $detectSummary += "Installed $WingetAppID via Winget. "
+            Write-Host "Winget successfully uninstalled application."
+            $detectSummary += "Uninstalled $WingetAppID via Winget. "
             $result = 0
         } else {
-            $detectSummary += "Error during installation: $installInfo, exit code: $exitCode. "
+            $detectSummary += "Error during uninstall: $uninstallInfo, exit code: $exitCode. "
             $result = 1
         }
     }
     catch {
-        Write-Host "Encountered an error during installation: $_"
-        $detectSummary += "Installation failed with exit code $($processResult.ExitCode). "
+        Write-Host "Encountered an error during uninstall: $_"
+        $detectSummary += "Uninstall failed with exit code $($processResult.ExitCode). "
         $result = 1
     }
 }
