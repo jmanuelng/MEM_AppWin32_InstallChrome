@@ -33,7 +33,7 @@ A special thanks to John Bryntze! His videos, referenced [here](https://www.yout
    - Upload the `.intunewin` file generated in the previous step.
    - Configure the app information, settings, and assignments as needed.
        - Install command: `powershell.exe -executionpolicy ByPass -file .\Install_Chrome.ps1`
-       - Uninstall command: `powershell.exe -executionpolicy ByPass -file .\Uninstallchrome.ps1`
+       - Uninstall command: `powershell.exe -executionpolicy ByPass -file .\Uninstall_Chrome.ps1`
        - Detection rules: Use custom script `Detect_Chrome.ps1`
    - Save and assign the app to desired group(s).
 
