@@ -158,7 +158,7 @@ if ($result -eq 0) {
     try {
         $tempFile = New-TemporaryFile
         Write-Host "Initiating App $WingetAppID Uninstall"
-        $processResult = Start-Process -FilePath "$wingetPath" -ArgumentList "uninstall -e --id ""$WingetAppID"" --scope=machine --silent --accept-source-agreements --force" -NoNewWindow -Wait -RedirectStandardOutput $tempFile.FullName -PassThru
+        $processResult = Start-Process -FilePath "$wingetPath" -ArgumentList "uninstall -e --id ""$WingetAppID"" --scope=machine --silent --accept-source-agreements --disable-interactivity --force" -NoNewWindow -Wait -RedirectStandardOutput $tempFile.FullName -PassThru
 
         $exitCode = $processResult.ExitCode
         $uninstallInfo = Get-Content $tempFile.FullName
