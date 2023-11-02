@@ -140,6 +140,99 @@ function Find-WingetPath {
     return $null
 }
 
+function Install-VisualCIfMissing {
+    <#
+    .SYNOPSIS
+        Checks for the presence of Microsoft Visual C++ Redistributable on the system and installs it if missing.
+
+    .DESCRIPTION
+        This function is designed to ensure that the Microsoft Visual C++ 2015-2022 Redistributable (x64) is installed on the system.
+        It checks the system's uninstall registry keys for an existing installation of the specified version of Visual C++ Redistributable.
+        If not found, proceeds to download the installer from the official Microsoft link and installs it silently without user interaction.
+        Function returns a boolean value indicating the success or failure of the installation or the presence of the redistributable.
+
+
+    .PARAMETER vcRedistUrl
+        The URL from which the Visual C++ Redistributable installer will be downloaded.
+        Default is set to the latest supported Visual C++ Redistributable direct download link from Microsoft.
+
+    .PARAMETER vcRedistFilePath
+        The local file path where the Visual C++ Redistributable installer will be downloaded to.
+        Default is set to the Windows TEMP directory with the filename 'vc_redist.x64.exe'.
+
+    .PARAMETER vcDisplayName
+        The display name of the Visual C++ Redistributable to check for in the system's uninstall registry keys.
+        This is used to determine if the redistributable is already installed.
+
+    .EXAMPLE
+        $vcInstalled = Install-VisualCIfMissing
+        This example calls the function and stores the result in the variable $vcInstalled.
+        After execution, $vcInstalled will be true if the redistributable is installed, otherwise false.
+
+    .NOTES
+        This function requires administrative privileges to install the Visual C++ Redistributable.
+        Ensure that the script is run in a context that has the necessary permissions.
+
+        The function uses the Start-Process cmdlet to execute the installer, which requires the '-Wait' parameter to ensure
+        that the installation process completes before the script proceeds.
+
+        Error handling is implemented to catch any exceptions during the download and installation process.
+        If an error occurs, the function will return false and output the error message.
+
+        It is recommended to test this function in a controlled environment before deploying it in a production setting.
+
+    .LINK
+        For more information on Microsoft Visual C++ Redistributable, visit:
+        https://docs.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist
+
+    #>
+
+    # Define the Visual C++ Redistributable download URL and file path
+    $vcRedistUrl = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
+    $vcRedistFilePath = "$env:TEMP\vc_redist.x64.exe"
+
+    # Define the display name for the Visual C++ Redistributable to check if it's installed
+    $vcDisplayName = "Microsoft Visual C++ 2015-2022 Redistributable (x64)"
+
+    # Check if Visual C++ Redistributable is already installed
+    $vcInstalled = Get-ChildItem HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall, HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall |
+                   Get-ItemProperty |
+                   Where-Object { $_.DisplayName -like "*$vcDisplayName*" }
+
+    if ($vcInstalled) {
+        Write-Host "Microsoft Visual C++ Redistributable is already installed."
+        return $true
+    } else {
+        Write-Host "Microsoft Visual C++ Redistributable not found. Attempting to install..."
+
+        # Download the Visual C++ Redistributable installer
+        try {
+            Invoke-WebRequest -Uri $vcRedistUrl -OutFile $vcRedistFilePath
+        } catch {
+            Write-Error "Failed to download Visual C++ Redistributable: $_"
+            return $false
+        }
+
+        # Install the Visual C++ Redistributable
+        try {
+            Start-Process -FilePath $vcRedistFilePath -ArgumentList '/install', '/quiet', '/norestart' -Wait
+
+            # Check if the installation was successful by verifying the exit code
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "Successfully installed Microsoft Visual C++ Redistributable."
+                return $true
+            } else {
+                Write-Error "Visual C++ Redistributable installation failed with exit code $LASTEXITCODE."
+                return $false
+            }
+        } catch {
+            Write-Error "Failed to install Visual C++ Redistributable: $_"
+            return $false
+        }
+    }
+}
+
+
 
 #endregion Functions
 
@@ -162,7 +255,17 @@ Write-Host `n`n
 Invoke-Ensure64bitEnvironment
 Write-Host "Script running in 64-bit environment."
 
-# Check if Winget is installed and, if not, find it
+# Find if Visual C++ redistributable is installed using Install-VisualCIfMissing function and capture the result
+$vcInstalled = Install-VisualCIfMissing
+
+if ($vcInstalled) {
+    $detectSummary += "Visual C++ Redistributable installed. "
+} else {
+    $detectSummary += "Failed to verify or install Visual C++ Redistributable. "
+    $result = 5
+}
+
+# Check if Winget is available and, if not, find it
 $wingetPath = (Get-Command -Name winget -ErrorAction SilentlyContinue).Source
 
 if (-not $wingetPath) {
@@ -173,7 +276,7 @@ if (-not $wingetPath) {
 if (-not $wingetPath) {
     Write-Host "Winget (Windows Package Manager) is absent on this device." 
     $detectSummary += "Winget NOT detected. "
-    $result = 5
+    $result = 6
 } else {
     $detectSummary += "Winget located at $wingetPath. "
 }
