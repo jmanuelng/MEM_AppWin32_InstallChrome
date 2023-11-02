@@ -100,6 +100,42 @@ function Get-ChromeExeDetails {
 }
 
 function Test-WingetAndDependencies {
+    <#
+    .SYNOPSIS
+    Tests for presence of Winget and required dependencies on the system.
+
+    .DESCRIPTION
+    Checks if the Windows Package Manager (Winget) is installed and verifies necessary dependencies, including the Desktop App Installer and Microsoft.UI.Xaml. Returns a status code indicating the result of the check.
+    Ensures that the necessary components for Winget to function correctly are present before attempting any package installations.
+
+    .EXAMPLE
+    $checkResult = Test-WingetAndDependencies
+    if ($checkResult -eq 0) {
+        Write-Host "Winget and all dependencies are present."
+    } elseif ($checkResult -eq 1) {
+        Write-Host "Winget is not installed."
+    } elseif ($checkResult -eq 2) {
+        Write-Host "Winget is installed, but one or more dependencies are missing."
+    }
+
+    This example calls the Test-WingetAndDependencies function and acts based on the returned status code.
+
+    .OUTPUTS
+    Int
+    Returns an integer value indicating the status of the check:
+    0 - Winget and all dependencies are detected successfully.
+    1 - Winget is not detected.
+    2 - Winget is detected but one or more dependencies are not found.
+
+    .NOTES
+    Date: November 2, 2023
+
+    Function does not attempt to install Winget or its dependencies. It only checks for their presence and reports the findings.
+
+    .LINK
+    Documentation for Winget: https://docs.microsoft.com/en-us/windows/package-manager/winget/
+    #>
+
     # Initialize the summary variable
     $usrFeedback = ""
     $returnCode = 0
