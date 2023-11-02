@@ -233,6 +233,162 @@ function Install-VisualCIfMissing {
 }
 
 
+function Install-WingetAsSystem {
+    <#
+    .SYNOPSIS
+        Installs the Windows Package Manager (winget) as a system app by creating a scheduled task.
+
+    .DESCRIPTION
+        This function creates a scheduled task that runs a PowerShell script to install the latest version of winget and its dependencies.
+        It is designed to install winget in the system context, making it available to all users on the device.
+        The installation script is adapted from the winget-pkgs repository on GitHub, ensuring the latest version and dependencies are installed.
+
+        The function is based on the 'InstallWingetAsSystem' function from the 'Winget-InstallPackage.ps1' script
+        by djust270, which can be found at:
+        https://github.com/djust270/Intune-Scripts/blob/master/Winget-InstallPackage.ps1
+
+        The installation script within the function is adapted from:
+        https://github.com/microsoft/winget-pkgs/blob/master/Tools/SandboxTest.ps1
+
+    .EXAMPLE
+        Install-WingetAsSystem
+
+        Installs winget as a system app by creating and running a scheduled task.
+
+    .NOTES
+        Administrative privileges are required to create scheduled tasks and install winget as a system app.
+
+    .LINK
+        Original script source for Install-WingetAsSystem: https://github.com/djust270/Intune-Scripts/blob/master/Winget-InstallPackage.ps1
+        Original script source for winget installation: https://github.com/microsoft/winget-pkgs/blob/master/Tools/SandboxTest.ps1
+
+    #>
+    # PowerShell script block that will be executed by the scheduled task
+    $scriptBlock = @'
+        # Function to install the latest version of WinGet and its dependencies
+        function Install-WinGet {
+            $tempFolderName = 'WinGetInstall'
+            $tempFolder = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath $tempFolderName
+            New-Item $tempFolder -ItemType Directory -ErrorAction SilentlyContinue | Out-Null
+            
+            $apiLatestUrl = if ($Prerelease) { 'https://api.github.com/repos/microsoft/winget-cli/releases?per_page=1' }
+            else { 'https://api.github.com/repos/microsoft/winget-cli/releases/latest' }
+            
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+            $WebClient = New-Object System.Net.WebClient
+            
+            function Get-LatestUrl
+            {
+                ((Invoke-WebRequest $apiLatestUrl -UseBasicParsing | ConvertFrom-Json).assets | Where-Object { $_.name -match '^Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle$' }).browser_download_url
+            }
+            
+            function Get-LatestHash
+            {
+                $shaUrl = ((Invoke-WebRequest $apiLatestUrl -UseBasicParsing | ConvertFrom-Json).assets | Where-Object { $_.name -match '^Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.txt$' }).browser_download_url
+                
+                $shaFile = Join-Path -Path $tempFolder -ChildPath 'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.txt'
+                $WebClient.DownloadFile($shaUrl, $shaFile)
+                
+                Get-Content $shaFile
+            }
+            
+            $desktopAppInstaller = @{
+                fileName = 'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle'
+                url	     = $(Get-LatestUrl)
+                hash	 = $(Get-LatestHash)
+            }
+            
+            $vcLibsUwp = @{
+                fileName = 'Microsoft.VCLibs.x64.14.00.Desktop.appx'
+                url	     = 'https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx'
+                hash	 = '9BFDE6CFCC530EF073AB4BC9C4817575F63BE1251DD75AAA58CB89299697A569'
+            }
+            $uiLibsUwp = @{
+                fileName = 'Microsoft.UI.Xaml.2.7.zip'
+                url	     = 'https://www.nuget.org/api/v2/package/Microsoft.UI.Xaml/2.7.0'
+                hash	 = '422FD24B231E87A842C4DAEABC6A335112E0D35B86FAC91F5CE7CF327E36A591'
+            }
+            
+            $dependencies = @($desktopAppInstaller, $vcLibsUwp, $uiLibsUwp)
+            
+            Write-Host '--> Checking dependencies'
+            
+            foreach ($dependency in $dependencies)
+            {
+                $dependency.file = Join-Path -Path $tempFolder -ChildPath $dependency.fileName
+                #$dependency.pathInSandbox = (Join-Path -Path $tempFolderName -ChildPath $dependency.fileName)
+                
+                # Only download if the file does not exist, or its hash does not match.
+                if (-Not ((Test-Path -Path $dependency.file -PathType Leaf) -And $dependency.hash -eq $(Get-FileHash $dependency.file).Hash))
+                {
+                    Write-Host @"
+            - Downloading:
+                $($dependency.url)
+        "@
+                    
+                    try
+                    {
+                        $WebClient.DownloadFile($dependency.url, $dependency.file)
+                    }
+                    catch
+                    {
+                        #Pass the exception as an inner exception
+                        throw [System.Net.WebException]::new("Error downloading $($dependency.url).", $_.Exception)
+                    }
+                    if (-not ($dependency.hash -eq $(Get-FileHash $dependency.file).Hash))
+                    {
+                        throw [System.Activities.VersionMismatchException]::new('Dependency hash does not match the downloaded file')
+                    }
+                }
+            }
+            
+            # Extract Microsoft.UI.Xaml from zip (if freshly downloaded).
+            # This is a workaround until https://github.com/microsoft/winget-cli/issues/1861 is resolved.
+            
+            if (-Not (Test-Path (Join-Path -Path $tempFolder -ChildPath \Microsoft.UI.Xaml.2.7\tools\AppX\x64\Release\Microsoft.UI.Xaml.2.7.appx)))
+            {
+                Expand-Archive -Path $uiLibsUwp.file -DestinationPath ($tempFolder + '\Microsoft.UI.Xaml.2.7') -Force
+            }
+            $uiLibsUwp.file = (Join-Path -Path $tempFolder -ChildPath \Microsoft.UI.Xaml.2.7\tools\AppX\x64\Release\Microsoft.UI.Xaml.2.7.appx)
+            Add-AppxPackage -Path $($desktopAppInstaller.file) -DependencyPath $($vcLibsUwp.file), $($uiLibsUwp.file)
+            # Clean up files
+            Remove-Item $tempFolder -recurse -force
+    }
+    # Call the Install-WinGet function to perform the installation
+    Install-WinGet
+'@
+
+    # Ensure the automation directory exists
+    if (!(Test-Path "$env:systemdrive\automation")) {
+        New-Item "$env:systemdrive\automation" -ItemType Directory | Out-Null
+    }
+
+    # Write the script block to a file in the automation directory
+    $scriptBlock | Out-File "$env:systemdrive\automation\script.ps1"
+
+    # Create the scheduled task action to run the PowerShell script
+    $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-executionpolicy bypass -WindowStyle minimized -file %HOMEDRIVE%\automation\script.ps1"
+
+    # Create the scheduled task trigger to run at log on
+    $trigger = New-ScheduledTaskTrigger -AtLogOn
+
+    # Get the current user's username to set as the principal of the task
+    $principal = New-ScheduledTaskPrincipal -UserId ((Get-CimInstance -ClassName Win32_ComputerSystem).UserName)
+
+    # Create the scheduled task
+    $task = New-ScheduledTask -Action $action -Trigger $trigger -Principal $principal
+
+    # Register and start the scheduled task
+    Register-ScheduledTask RunScript -InputObject $task
+    Start-ScheduledTask -TaskName RunScript
+
+    # Wait for the task to complete
+    Start-Sleep -Seconds 120
+
+    # Unregister and remove the scheduled task and script file
+    Unregister-ScheduledTask -TaskName RunScript -Confirm:$false
+    Remove-Item "$env:systemdrive\automation\script.ps1"
+}
 
 #endregion Functions
 
