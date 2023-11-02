@@ -99,6 +99,46 @@ function Get-ChromeExeDetails {
     return $null
 }
 
+function Check-WingetAndDependencies {
+    # Initialize the summary variable
+    $usrFeedback = ""
+    $returnCode = 0
+
+    # Check if Winget is installed
+    $wingetPath = (Get-Command -Name winget -ErrorAction SilentlyContinue).Source
+    if (-not $wingetPath) {
+        $usrFeedback += "Winget NOT detected. "
+        $returnCode = 1
+    } else {
+        $usrFeedback += "Winget detected at $wingetPath. "
+    }
+
+    # Check for Desktop App Installer
+    $desktopAppInstaller = Get-AppxPackage -Name Microsoft.DesktopAppInstaller
+    if (-not $desktopAppInstaller) {
+        $usrFeedback += "Desktop App Installer NOT detected. "
+        $returnCode = 2
+    }
+    else {
+        $usrFeedback += "Desktop App Installer confirmed. "
+    }
+
+    # Check for Microsoft.UI.Xaml
+    $uiXaml = Get-AppxPackage -Name Microsoft.UI.Xaml.2* # Assuming version 2.x is required
+    if (-not $uiXaml) {
+        $usrFeedback += "Microsoft.UI.Xaml NOT detected. "
+        $returnCode = 2
+    }
+    else {
+        $usrFeedback += "Microsoft.UI.Xaml confirmed. "
+    }
+
+    Write-Host $usrFeedback
+
+    # Return the appropriate code
+    return $returnCode
+}
+
 #endregion Functions
 
 
@@ -129,6 +169,15 @@ if ($null -ne $appChrome)  {
 else {
     Write-Host "Google Chrome not installed on device."
     $detectSummary += "Chrome not found on device. "
+
+    # If Chrome not installed, check Winget and dependencies
+    $wingetCheckResult = Check-WingetAndDependencies
+    switch ($wingetCheckResult) {
+        0 { $detectSummary += "Winget and all dependencies detected successfully. "}
+        1 { $detectSummary += "Winget NOT detected. "}
+        2 { $detectSummary += "Winget detected but one or more dependencies NOT found. " }
+    }
+
     $result = 1
 }
 

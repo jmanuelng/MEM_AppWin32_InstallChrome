@@ -430,6 +430,12 @@ if (-not $wingetPath) {
 }
 
 if (-not $wingetPath) {
+    Write-Host "Trying to install latest Winget using Install-WingetAsSystem...."
+    Install-WingetAsSystem
+    $wingetPath = Find-WingetPath
+}
+
+if (-not $wingetPath) {
     Write-Host "Winget (Windows Package Manager) is absent on this device." 
     $detectSummary += "Winget NOT detected. "
     $result = 6
