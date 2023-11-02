@@ -99,7 +99,7 @@ function Get-ChromeExeDetails {
     return $null
 }
 
-function Check-WingetAndDependencies {
+function Test-WingetAndDependencies {
     # Initialize the summary variable
     $usrFeedback = ""
     $returnCode = 0
@@ -171,7 +171,7 @@ else {
     $detectSummary += "Chrome not found on device. "
 
     # If Chrome not installed, check Winget and dependencies
-    $wingetCheckResult = Check-WingetAndDependencies
+    $wingetCheckResult = Test-WingetAndDependencies
     switch ($wingetCheckResult) {
         0 { $detectSummary += "Winget and all dependencies detected successfully. "}
         1 { $detectSummary += "Winget NOT detected. "}
