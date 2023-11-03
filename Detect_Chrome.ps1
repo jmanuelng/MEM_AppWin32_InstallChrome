@@ -102,10 +102,10 @@ function Get-ChromeExeDetails {
 function Test-WingetAndDependencies {
     <#
     .SYNOPSIS
-    Tests for presence of Winget and required dependencies on the system.
+    Tests for presence of Winget and required dependencies on the system, including the Visual C++ Redistributable.
 
     .DESCRIPTION
-    Checks if the Windows Package Manager (Winget) is installed and verifies necessary dependencies, including the Desktop App Installer and Microsoft.UI.Xaml. Returns a status code indicating the result of the check.
+    Checks if the Windows Package Manager (Winget) is installed and verifies necessary dependencies, including the Desktop App Installer, Microsoft.UI.Xaml, and the Visual C++ Redistributable. Returns a status code indicating the result of the check.
     Ensures that the necessary components for Winget to function correctly are present before attempting any package installations.
 
     .EXAMPLE
@@ -154,8 +154,7 @@ function Test-WingetAndDependencies {
     if (-not $desktopAppInstaller) {
         $usrFeedback += "Desktop App Installer NOT detected. "
         $returnCode = 2
-    }
-    else {
+    } else {
         $usrFeedback += "Desktop App Installer confirmed. "
     }
 
@@ -164,9 +163,20 @@ function Test-WingetAndDependencies {
     if (-not $uiXaml) {
         $usrFeedback += "Microsoft.UI.Xaml NOT detected. "
         $returnCode = 2
-    }
-    else {
+    } else {
         $usrFeedback += "Microsoft.UI.Xaml confirmed. "
+    }
+
+    # Check for Visual C++ Redistributable
+    $vcDisplayName = "Microsoft Visual C++ 2015-2022 Redistributable (x64)"
+    $vcInstalled = Get-ChildItem HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall, HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall |
+                   Get-ItemProperty |
+                   Where-Object { $_.DisplayName -like "*$vcDisplayName*" }
+    if (-not $vcInstalled) {
+        $usrFeedback += "Visual C++ Redistributable NOT detected. "
+        $returnCode = 2
+    } else {
+        $usrFeedback += "Visual C++ Redistributable confirmed. "
     }
 
     Write-Host $usrFeedback
@@ -174,6 +184,7 @@ function Test-WingetAndDependencies {
     # Return the appropriate code
     return $returnCode
 }
+
 
 #endregion Functions
 
