@@ -215,6 +215,7 @@ function Install-VisualCIfMissing {
 
         # Install the Visual C++ Redistributable
         try {
+            $error.Clear()
             Start-Process -FilePath $vcRedistFilePath -ArgumentList '/install', '/quiet', '/norestart' -Wait
 
             # Check if the installation was successful by verifying the exit code
