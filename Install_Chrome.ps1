@@ -234,6 +234,77 @@ function Install-VisualCIfMissing {
 }
 
 
+function Get-LoggedOnUser {
+    <#
+    .SYNOPSIS
+    Retrieves the user identifier of the currently logged-on user or the most recently logged-on user based on active explorer.exe processes.
+
+    .DESCRIPTION
+    The function performs a two-step verification to determine the active user on a Windows system. 
+    Initially, it attempts to identify the currently logged-on user via the Win32_ComputerSystem class. 
+    Should this approach fail, it proceeds to evaluate all running explorer.exe processes to ascertain 
+    which user session was initiated most recently.
+
+    .OUTPUTS
+    System.String
+    Outputs a string in the format "DOMAIN\Username" representing the active or most recent user. 
+    If no user can be identified, it outputs $null.
+
+    .EXAMPLE
+    $UserId = Get-LoggedOnUser
+    if ($UserId) {
+        Write-Host "The active or most recently connected user is: $UserId"
+    } else {
+        Write-Host "Unable to identify the active or most recently connected user."
+    }
+
+    In this example, the function retrieves the user identifier of the active or most recent user
+    and prints it to the console. If no user can be determined, it conveys an appropriate message.
+
+    .NOTES
+    Execution context: This function is intended to be run with administrative privileges to ensure accurate retrieval of user information.
+
+    Assumptions: This function assumes that the presence of an explorer.exe process correlates with an interactive user session
+     and utilizes this assumption to determine the user identity.
+
+    Error Handling: If the function encounters any issues while attempting to identify the user via Win32_ComputerSystem,
+     it outputs a warning and falls back to the process-based identification method.
+
+    #>
+
+    # Initialization and Win32_ComputerSystem user retrieval
+    $loggedOnUser = $null
+    try {
+        $loggedOnUser = Get-CimInstance -ClassName Win32_ComputerSystem | Select-Object -ExpandProperty UserName
+        if ($loggedOnUser) {
+            return $loggedOnUser
+        }
+    } catch {
+        Write-Warning "Query to Win32_ComputerSystem failed to retrieve the logged-on user."
+    }
+
+    # Fallback method using explorer.exe processes
+    $explorerProcesses = Get-WmiObject Win32_Process -Filter "name = 'explorer.exe'"
+    $userSessions = @()
+    foreach ($process in $explorerProcesses) {
+        $ownerInfo = $process.GetOwner()
+        $startTime = $process.ConvertToDateTime($process.CreationDate)
+        $userSessions += New-Object PSObject -Property @{
+            User      = "$($ownerInfo.Domain)\$($ownerInfo.User)"
+            StartTime = $startTime
+        }
+    }
+
+    # Identification of the most recent user session
+    $mostRecentUserSession = $userSessions | Sort-Object StartTime -Descending | Select-Object -First 1
+    if ($mostRecentUserSession) {
+        return $mostRecentUserSession.User
+    } else {
+        return $null
+    }
+}
+
+
 function Install-WingetAsSystem {
     <#
     .SYNOPSIS
@@ -309,7 +380,7 @@ function Install-WingetAsSystem {
                 url	     = 'https://www.nuget.org/api/v2/package/Microsoft.UI.Xaml/2.7.0'
                 hash	 = '422FD24B231E87A842C4DAEABC6A335112E0D35B86FAC91F5CE7CF327E36A591'
             }
-            
+
             $dependencies = @($desktopAppInstaller, $vcLibsUwp, $uiLibsUwp)
             
             Write-Host '--> Checking dependencies'
@@ -322,10 +393,7 @@ function Install-WingetAsSystem {
                 # Only download if the file does not exist, or its hash does not match.
                 if (-Not ((Test-Path -Path $dependency.file -PathType Leaf) -And $dependency.hash -eq $(Get-FileHash $dependency.file).Hash))
                 {
-                    Write-Host @"
-            - Downloading:
-                $($dependency.url)
-        "@
+                    Write-Host "`t- Downloading: `n`t$($dependency.url)"
                     
                     try
                     {
@@ -359,22 +427,26 @@ function Install-WingetAsSystem {
     Install-WinGet
 '@
 
+    # Name for Temp Script.
+    $tmpScript = "WingetScript.ps1"
+    
     # Ensure the automation directory exists
     if (!(Test-Path "$env:systemdrive\automation")) {
         New-Item "$env:systemdrive\automation" -ItemType Directory | Out-Null
     }
 
     # Write the script block to a file in the automation directory
-    $scriptBlock | Out-File "$env:systemdrive\automation\script.ps1"
+    $scriptBlock | Out-File "$env:systemdrive\automation\$tmpScript"
 
     # Create the scheduled task action to run the PowerShell script
-    $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-executionpolicy bypass -WindowStyle minimized -file %HOMEDRIVE%\automation\script.ps1"
+    $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-executionpolicy bypass -WindowStyle minimized -file %SYSTEMDRIVE%\automation\$tmpScript"
 
     # Create the scheduled task trigger to run at log on
     $trigger = New-ScheduledTaskTrigger -AtLogOn
 
     # Get the current user's username to set as the principal of the task
-    $principal = New-ScheduledTaskPrincipal -UserId ((Get-CimInstance -ClassName Win32_ComputerSystem).UserName)
+    $UserId = Get-LoggedOnUser
+    $principal = New-ScheduledTaskPrincipal -UserId $UserId
 
     # Create the scheduled task
     $task = New-ScheduledTask -Action $action -Trigger $trigger -Principal $principal
@@ -388,7 +460,7 @@ function Install-WingetAsSystem {
 
     # Unregister and remove the scheduled task and script file
     Unregister-ScheduledTask -TaskName RunScript -Confirm:$false
-    Remove-Item "$env:systemdrive\automation\script.ps1"
+    Remove-Item "$env:systemdrive\automation\$tmpScript"
 }
 
 #endregion Functions
@@ -430,18 +502,21 @@ if (-not $wingetPath) {
     $wingetPath = Find-WingetPath
 }
 
+# If not present, try to install it
 if (-not $wingetPath) {
     Write-Host "Trying to install latest Winget using Install-WingetAsSystem...."
     Install-WingetAsSystem
     $wingetPath = Find-WingetPath
 }
 
+# If still not present, notify, or maybe it did find it, yei!!
 if (-not $wingetPath) {
     Write-Host "Winget (Windows Package Manager) is absent on this device." 
     $detectSummary += "Winget NOT detected. "
     $result = 6
 } else {
     $detectSummary += "Winget located at $wingetPath. "
+    $result = 0
 }
 
 # Use Winget to install the desired software
