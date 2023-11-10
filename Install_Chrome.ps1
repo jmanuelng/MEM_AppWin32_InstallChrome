@@ -18,7 +18,7 @@
     in production environments.
 
 .LAST MODIFIED
-    August 7th, 2023
+    November 9th, 2023
 
 #>
 
@@ -200,37 +200,43 @@ function Install-VisualCIfMissing {
                    Where-Object { $_.DisplayName -like "*$vcDisplayName*" }
 
     if ($vcInstalled) {
+        # Visual C++ is already installed, no action needed
         Write-Host "Microsoft Visual C++ Redistributable is already installed."
         return $true
     } else {
+        # Visual C++ is not installed, proceed with download and installation
         Write-Host "Microsoft Visual C++ Redistributable not found. Attempting to install..."
 
-        # Download the Visual C++ Redistributable installer
+        # Attempt to download the Visual C++ Redistributable installer
         try {
-            Invoke-WebRequest -Uri $vcRedistUrl -OutFile $vcRedistFilePath
+            Invoke-WebRequest -Uri $vcRedistUrl -OutFile $vcRedistFilePath -ErrorAction Stop
+            Write-Host "Download of Visual C++ Redistributable succeeded."
         } catch {
-            Write-Error "Failed to download Visual C++ Redistributable: $_"
+            # Log detailed error message and halt execution if download fails
+            Write-Error "Failed to download Visual C++ Redistributable: $($_.Exception.Message)"
             return $false
         }
 
-        # Install the Visual C++ Redistributable
+        # Attempt to install the Visual C++ Redistributable
         try {
-            $error.Clear()
-            Start-Process -FilePath $vcRedistFilePath -ArgumentList '/install', '/quiet', '/norestart' -Wait
-
-            # Check if the installation was successful by verifying the exit code
-            if ($LASTEXITCODE -eq 0) {
+            # Start the installer and wait for it to complete, capturing the process object
+            $process = Start-Process -FilePath $vcRedistFilePath -ArgumentList '/install', '/quiet', '/norestart' -Wait -PassThru -ErrorAction Stop
+            # Check the exit code of the installer process to determine success
+            if ($process.ExitCode -eq 0) {
                 Write-Host "Successfully installed Microsoft Visual C++ Redistributable."
                 return $true
             } else {
-                Write-Error "Visual C++ Redistributable installation failed with exit code $LASTEXITCODE."
+                # Log detailed error message if installation fails
+                Write-Error "Visual C++ Redistributable installation failed with exit code $($process.ExitCode)."
                 return $false
             }
         } catch {
-            Write-Error "Failed to install Visual C++ Redistributable: $_"
+            # Log detailed error message and halt execution if installation process fails
+            Write-Error "Failed to install Visual C++ Redistributable: $($_.Exception.Message)"
             return $false
         }
     }
+                
 }
 
 

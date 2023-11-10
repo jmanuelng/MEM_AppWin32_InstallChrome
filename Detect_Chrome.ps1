@@ -37,7 +37,7 @@
     in production environments.
 
 .LAST MODIFIED
-    August 6th, 2023
+    November 9th, 2023
 
 #>
 
@@ -102,88 +102,150 @@ function Get-ChromeExeDetails {
 function Test-WingetAndDependencies {
     <#
     .SYNOPSIS
-    Tests for presence of Winget and required dependencies on the system, including the Visual C++ Redistributable.
+    Tests for the presence of Winget and required dependencies on the system.
 
     .DESCRIPTION
-    Checks if the Windows Package Manager (Winget) is installed and verifies necessary dependencies, including the Desktop App Installer, Microsoft.UI.Xaml, and the Visual C++ Redistributable. Returns a status code indicating the result of the check.
-    Ensures that the necessary components for Winget to function correctly are present before attempting any package installations.
+    Checks if the Windows Package Manager (Winget) is installed and verifies necessary dependencies, 
+    including the Desktop App Installer, Microsoft.UI.Xaml, and the Visual C++ Redistributable. 
+    Returns a string with unique identifiers indicating the result of the check and outputs feedback to the console.
+    This allows for precise identification of which components are missing.
 
     .EXAMPLE
     $checkResult = Test-WingetAndDependencies
-    if ($checkResult -eq 0) {
+    if ($checkResult -eq "0") {
         Write-Host "Winget and all dependencies are present."
-    } elseif ($checkResult -eq 1) {
-        Write-Host "Winget is not installed."
-    } elseif ($checkResult -eq 2) {
-        Write-Host "Winget is installed, but one or more dependencies are missing."
+    } else {
+        Write-Host "Missing components: $checkResult"
     }
-
-    This example calls the Test-WingetAndDependencies function and acts based on the returned status code.
+    This example calls the Test-WingetAndDependencies function and acts based on the returned status string.
 
     .OUTPUTS
-    Int
-    Returns an integer value indicating the status of the check:
-    0 - Winget and all dependencies are detected successfully.
-    1 - Winget is not detected.
-    2 - Winget is detected but one or more dependencies are not found.
+    String
+    Returns a string value with concatenated identifiers indicating the status of the check:
+    "0" - Winget and all dependencies are detected successfully.
+    "W" - Winget is not detected.
+    "D" - Desktop App Installer is not detected.
+    "U" - Microsoft.UI.Xaml is not detected.
+    "V" - Visual C++ Redistributable is not detected.
+    Concatenated string for multiple missing components, e.g., "DU" for missing Desktop App Installer and Microsoft.UI.Xaml.
 
     .NOTES
-    Date: November 2, 2023
-
-    Function does not attempt to install Winget or its dependencies. It only checks for their presence and reports the findings.
+    Date: November 9, 2023
+    The function does not attempt to install Winget or its dependencies. It only checks for their presence, reports the findings, and outputs feedback to the console.
 
     .LINK
     Documentation for Winget: https://docs.microsoft.com/en-us/windows/package-manager/winget/
     #>
 
-    # Initialize the summary variable
-    $usrFeedback = ""
-    $returnCode = 0
+    # Initialize an array to hold missing component identifiers
+    $missingComponents = @()
 
     # Check if Winget is installed
     $wingetPath = (Get-Command -Name winget -ErrorAction SilentlyContinue).Source
     if (-not $wingetPath) {
-        $usrFeedback += "Winget NOT detected. "
-        $returnCode = 1
+        $missingComponents += "W" # Add 'W' to the array if Winget is missing
+        Write-Host "Winget is NOT installed."
     } else {
-        $usrFeedback += "Winget detected at $wingetPath. "
+        Write-Host "Winget is installed."
     }
 
     # Check for Desktop App Installer
-    $desktopAppInstaller = Get-AppxPackage -Name Microsoft.DesktopAppInstaller
+    $desktopAppInstaller = Get-AppxPackage -Name Microsoft.DesktopAppInstaller -ErrorAction SilentlyContinue
     if (-not $desktopAppInstaller) {
-        $usrFeedback += "Desktop App Installer NOT detected. "
-        $returnCode = 2
+        $missingComponents += "D" # Add 'D' to the array if Desktop App Installer is missing
+        Write-Host "Desktop App Installer is NOT installed."
     } else {
-        $usrFeedback += "Desktop App Installer confirmed. "
+        Write-Host "Desktop App Installer is installed."
     }
 
     # Check for Microsoft.UI.Xaml
-    $uiXaml = Get-AppxPackage -Name Microsoft.UI.Xaml.2* # Assuming version 2.x is required
+    $uiXaml = Get-AppxPackage -Name Microsoft.UI.Xaml.2* -ErrorAction SilentlyContinue # Assuming version 2.x is required
     if (-not $uiXaml) {
-        $usrFeedback += "Microsoft.UI.Xaml NOT detected. "
-        $returnCode = 2
+        $missingComponents += "U" # Add 'U' to the array if Microsoft.UI.Xaml is missing
+        Write-Host "Microsoft.UI.Xaml is NOT installed."
     } else {
-        $usrFeedback += "Microsoft.UI.Xaml confirmed. "
+        Write-Host "Microsoft.UI.Xaml is installed."
     }
 
     # Check for Visual C++ Redistributable
     $vcDisplayName = "Microsoft Visual C++ 2015-2022 Redistributable (x64)"
-    $vcInstalled = Get-ChildItem HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall, HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall |
+    $vcInstalled = Get-ChildItem HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall, 
+                                  HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall |
                    Get-ItemProperty |
-                   Where-Object { $_.DisplayName -like "*$vcDisplayName*" }
+                   Where-Object { $_.DisplayName -like "*$vcDisplayName*" } -ErrorAction SilentlyContinue
     if (-not $vcInstalled) {
-        $usrFeedback += "Visual C++ Redistributable NOT detected. "
-        $returnCode = 2
+        $missingComponents += "V" # Add 'V' to the array if Visual C++ Redistributable is missing
+        Write-Host "Visual C++ Redistributable is NOT installed."
     } else {
-        $usrFeedback += "Visual C++ Redistributable confirmed. "
+        Write-Host "Visual C++ Redistributable is installed."
     }
 
-    Write-Host $usrFeedback
-
-    # Return the appropriate code
-    return $returnCode
+    # Return a concatenated string of missing component identifiers
+    # If no components are missing, return '0'
+    if ($missingComponents.Length -eq 0) {
+        return "0"
+    } else {
+        return [String]::Join('', $missingComponents)
+    }
 }
+
+function Test-InternetConnectivity {
+    <#
+    .SYNOPSIS
+    Confirms internet connectivity to download content from github.com and nuget.org.
+
+    .DESCRIPTION
+    Tests the TCP connection to github.com and nuget.org on port 443 (HTTPS) to confirm internet connectivity.
+    Returns a string of characters that clearly identifies if there is a connectivity issue, and if so, to which URL or site.
+    Additionally, outputs simplified but clear feedback to the console.
+
+    .EXAMPLE
+    Test-InternetConnectivity
+    This example calls the Test-InternetConnectivity function and outputs the result to the console.
+
+    .OUTPUTS
+    String
+    Returns a string of characters indicating the connectivity status:
+    '0' - No connectivity issues.
+    'G' - Connectivity issue with github.com.
+    'N' - Connectivity issue with nuget.org.
+    'GN' - Connectivity issues with both sites.
+
+    .NOTES
+    Date: November 2, 2023
+    #>
+
+    # Initialize a variable to hold the connectivity status
+    $connectivityStatus = ''
+
+    # Test connectivity to github.com
+    $githubTest = Test-NetConnection -ComputerName 'github.com' -Port 443 -ErrorAction SilentlyContinue
+    if (-not $githubTest.TcpTestSucceeded) {
+        $connectivityStatus += 'G'
+        Write-Host "Connectivity issue with github.com."
+    } else {
+        Write-Host "Successfully connected to github.com."
+    }
+
+    # Test connectivity to nuget.org
+    $nugetTest = Test-NetConnection -ComputerName 'nuget.org' -Port 443 -ErrorAction SilentlyContinue
+    if (-not $nugetTest.TcpTestSucceeded) {
+        $connectivityStatus += 'N'
+        Write-Host "Connectivity issue with nuget.org."
+    } else {
+        Write-Host "Successfully connected to nuget.org."
+    }
+
+    # Determine the return value based on the tests
+    if ($connectivityStatus -eq '') {
+        Write-Host "Internet connectivity to both github.com and nuget.org is confirmed."
+        return '0' # No issues
+    } else {
+        Write-Host "Connectivity test completed with issues: $connectivityStatus"
+        return $connectivityStatus # Return the specific issue(s)
+    }
+}
+
 
 
 #endregion Functions
@@ -207,7 +269,7 @@ $appChrome = Get-ChromeExeDetails
 # Some spaces to make it easier to read in log file
 Write-Host `n`n
 
-if ($null -ne $appChrome)  {
+if ($null -ne $appChrome) {
     # Get the current version of Google Chrome
     $verChrome = $appChrome.DisplayVersion
     Write-Host "Found Installed Chrome version $verChrome"
@@ -219,17 +281,38 @@ else {
 
     # If Chrome not installed, check Winget and dependencies
     $wingetCheckResult = Test-WingetAndDependencies
-    switch ($wingetCheckResult) {
-        0 { $detectSummary += "Winget and all dependencies detected successfully. "}
-        1 { $detectSummary += "Winget NOT detected. "}
-        2 { $detectSummary += "Winget detected but one or more dependencies NOT found. " }
+    # Adjust the switch to handle string identifiers
+    switch -Regex ($wingetCheckResult) {
+        '0' { 
+            $detectSummary = "Winget and all dependencies detected successfully. " # Set summary exclusively for this case
+            break # Exit the switch to avoid processing other cases
+        }
+        'W' { $detectSummary += "Winget NOT detected. " }
+        'D' { $detectSummary += "Desktop App Installer NOT detected. " }
+        'U' { $detectSummary += "Microsoft.UI.Xaml NOT detected. " }
+        'V' { $detectSummary += "Visual C++ Redistributable NOT detected. " }
+        Default { $detectSummary += "Unknown dependency check result: $wingetCheckResult " }
     }
 
+    # Check internet connectivity to github.com and nuget.org
+    $internetConnectivityResult = Test-InternetConnectivity
+    # Adjust the switch to handle string identifiers for connectivity results
+    switch -Regex ($internetConnectivityResult) {
+        '0' { 
+            $detectSummary += "Connectivity to github.com and nuget.org confirmed. "
+        }
+        'G' { $detectSummary += "Connectivity issue with github.com. " }
+        'N' { $detectSummary += "Connectivity issue with nuget.org. " }
+        'GN' { $detectSummary += "Connectivity issues with both github.com and nuget.org. " }
+        Default { $detectSummary += "Unknown connectivity check result: $internetConnectivityResult " }
+    }
+    
     $result = 1
 }
 
 # Some spaces to make it easier to read in log file
 Write-Host `n`n
+
 
 #Return result
 if ($result -eq 0) {
